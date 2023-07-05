@@ -1,16 +1,15 @@
+import os
 import csv
 from reportlab.lib.pagesizes import letter, inch
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.enums import TA_CENTER
 from reportlab.platypus import Image
-from reportlab.platypus import Image
 from reportlab.platypus import PageBreak
 from reportlab.lib import colors
 from datetime import datetime, timedelta
 import math
 import matplotlib.pyplot as plt
-import os
 from kivy.app import App
 from kivy.uix.button import Button
 from kivy.uix.filechooser import FileChooserIconView
@@ -188,8 +187,9 @@ def get_task_color_mapping(csv_data, col):
     task_to_color = {task: color for task, color in zip(all_tasks, color_palette)}
 
     return task_to_color
+
 ##
-# Generate Plots
+# Generate Pie Charts
 ##
 def generate_pie_chart(subject, col, title, csv_data, task_to_color):
     locals()[subject + "_counts"] = consolidated_columns_items(csv_data, col)
@@ -202,6 +202,9 @@ def generate_pie_chart(subject, col, title, csv_data, task_to_color):
     plt.close()
     return path
 
+##
+# Generate Column Charts
+##
 def generate_column_chart(subject, col, title, csv_data, task_to_color):
     
     for row in csv_data:
@@ -243,14 +246,15 @@ def generate_column_chart(subject, col, title, csv_data, task_to_color):
     plt.close()
     return path
 
+##
+# Generate the PDF
+##
 def create_pdf(file_path):
     
     csv_data = read_csv(file_path)
-	# Prepare data
     title = 'Client Report'
     client = [row[2] for row in csv_data][0]
     content = []
-
     earliest_date_formatted, latest_date_formatted = timeframe(csv_data)
 
     # Create the PDF document
@@ -291,6 +295,7 @@ def create_pdf(file_path):
 	# Break the page
     content.append(PageBreak())
 
+	# Add Project and Activitites Charts
     content.append(Spacer(1, 33))
     project_colors = get_task_color_mapping(csv_data, col=3)
     project_path = generate_pie_chart(subject='project', col=3, title='Report by projects', csv_data=csv_data, task_to_color=project_colors)
@@ -302,11 +307,13 @@ def create_pdf(file_path):
 	# Break the page
     content.append(PageBreak())
 
+	# Add Activities over time Chart
     content.append(Spacer(1, 33))
     column_colors = get_task_color_mapping(csv_data, col=4)
     column_path = generate_column_chart(subject='columns', col=[0,4,6], title='Activities Over Time', csv_data=csv_data, task_to_color=column_colors)
     content.append(Image(column_path, width=576, height=324, hAlign="RIGHT"))
-	
+
+	# Add Billable CSV
     scvdata = []
     for row in csv_data:
         selected_columns = [row[0], row[3], row[4], row[5], row[6]]
@@ -322,13 +329,13 @@ def create_pdf(file_path):
             table.setStyle(TableStyle([('BACKGROUND', (0, row), (-1, row), colors.white)]))
         else:
             table.setStyle(TableStyle([('BACKGROUND', (0, row), (-1, row), colors.HexColor('#EAEAEA'))]))
-
     content.append(Paragraph('Billabe', left_style_subheading))
-    
     content.append(table)
 
+	# Build the Document
     doc.build(content, onFirstPage=first_page, onLaterPages=other_pages)
 
+	# Clean up
     try:
         os.remove(column_path)
         os.remove(activity_path)
@@ -336,11 +343,11 @@ def create_pdf(file_path):
     except OSError as e:
         print(f"Error deleting file(s): {e}")
 
+	# Notify terminal
     print("PDF created successfully.")
 
-# # Fire it up
-# create_pdf()
-class MyApp(App):
+# Build the GUI
+class ClientReports(App):
     def build(self):
         layout = BoxLayout(orientation='vertical')
         self.filechooser = FileChooserIconView()
@@ -360,5 +367,6 @@ class MyApp(App):
         print(f'Generating report from {file_path}')
         create_pdf(file_path)
 
+# Fire it up
 if __name__ == '__main__':
-    MyApp().run()
+    ClientReports().run()
