@@ -11,13 +11,17 @@ from datetime import datetime, timedelta
 import math
 import matplotlib.pyplot as plt
 import os
+from kivy.app import App
+from kivy.uix.button import Button
+from kivy.uix.filechooser import FileChooserIconView
+from kivy.uix.boxlayout import BoxLayout
 
 ##
 # Read the CSV
 ##
-def read_csv():
+def read_csv(file_path):
     csv_data = []
-    with open('data.csv', 'r') as csvfile:
+    with open(file_path, 'r') as csvfile:
         reader = csv.reader(csvfile)
         next(reader)
         for row in reader:
@@ -170,12 +174,27 @@ def projects_count_table(centered_style_normal, doc, csv_data):
     return projects_count_container
 
 ##
+# Map some colors
+##
+def get_task_color_mapping(csv_data, col):
+    all_tasks = []
+    for row in csv_data:
+        if row[col] not in all_tasks:
+            all_tasks.append(row[col])
+
+    # Define a color palette
+    color_palette = plt.cm.tab10(range(len(all_tasks)))
+
+    task_to_color = {task: color for task, color in zip(all_tasks, color_palette)}
+
+    return task_to_color
+##
 # Generate Plots
 ##
-def generate_pie_chart(subject, col, title, csv_data):
+def generate_pie_chart(subject, col, title, csv_data, task_to_color):
     locals()[subject + "_counts"] = consolidated_columns_items(csv_data, col)
     plt.figure(figsize=(16, 9))
-    plt.pie(locals()[subject + "_counts"].values(), labels=locals()[subject + "_counts"].keys(), autopct='%1.1f%%')
+    plt.pie(locals()[subject + "_counts"].values(), labels=locals()[subject + "_counts"].keys(), autopct='%1.1f%%', colors=[task_to_color[task] for task in locals()[subject + "_counts"].keys()])
     plt.title(title, fontsize=18, fontweight='bold')
     plt.legend(loc='upper left', bbox_to_anchor=(-0.5, 1))
     path = subject + ".png"
@@ -183,7 +202,7 @@ def generate_pie_chart(subject, col, title, csv_data):
     plt.close()
     return path
 
-def generate_column_chart(subject, col, title, csv_data):
+def generate_column_chart(subject, col, title, csv_data, task_to_color):
     
     for row in csv_data:
         row[col[0]] = datetime.strptime(row[col[0]], "%d %b %Y at %H:%M")
@@ -207,7 +226,7 @@ def generate_column_chart(subject, col, title, csv_data):
     colors = plt.cm.tab10(range(len(unique_tasks)))
 
     plt.figure(figsize=(16, 9))  # Adjust the figure size as desired
-    plt.bar(dates, time_invested, color=[colors[unique_tasks.index(task)] for task in tasks])
+    plt.bar(dates, time_invested, color=[task_to_color[task] for task in tasks])
     
     plt.xlabel('Timeline')
     plt.ylabel('Hours')
@@ -224,9 +243,9 @@ def generate_column_chart(subject, col, title, csv_data):
     plt.close()
     return path
 
-def create_pdf():
+def create_pdf(file_path):
     
-    csv_data = read_csv()
+    csv_data = read_csv(file_path)
 	# Prepare data
     title = 'Client Report'
     client = [row[2] for row in csv_data][0]
@@ -273,8 +292,10 @@ def create_pdf():
     content.append(PageBreak())
 
     content.append(Spacer(1, 33))
-    project_path = generate_pie_chart(subject='project', col=3, title='Report by projects', csv_data=csv_data)
-    activity_path = generate_pie_chart(subject='activity', col=4, title='Report by activities', csv_data=csv_data)
+    project_colors = get_task_color_mapping(csv_data, col=3)
+    project_path = generate_pie_chart(subject='project', col=3, title='Report by projects', csv_data=csv_data, task_to_color=project_colors)
+    activity_colors = get_task_color_mapping(csv_data, col=4)
+    activity_path = generate_pie_chart(subject='activity', col=4, title='Report by activities', csv_data=csv_data, task_to_color=activity_colors)
     content.append(Image(project_path, width=592, height=333, hAlign="RIGHT"))
     content.append(Image(activity_path, width=592, height=333, hAlign="RIGHT"))
     
@@ -282,7 +303,8 @@ def create_pdf():
     content.append(PageBreak())
 
     content.append(Spacer(1, 33))
-    column_path = generate_column_chart(subject='columns', col=[0,4,6], title='Activities Over Time', csv_data=csv_data)
+    column_colors = get_task_color_mapping(csv_data, col=4)
+    column_path = generate_column_chart(subject='columns', col=[0,4,6], title='Activities Over Time', csv_data=csv_data, task_to_color=column_colors)
     content.append(Image(column_path, width=576, height=324, hAlign="RIGHT"))
 	
     scvdata = []
@@ -311,11 +333,32 @@ def create_pdf():
         os.remove(column_path)
         os.remove(activity_path)
         os.remove(project_path)
-        os.remove('data.csv')
     except OSError as e:
         print(f"Error deleting file(s): {e}")
 
     print("PDF created successfully.")
 
-# Fire it up
-create_pdf()
+# # Fire it up
+# create_pdf()
+class MyApp(App):
+    def build(self):
+        layout = BoxLayout(orientation='vertical')
+        self.filechooser = FileChooserIconView()
+        layout.add_widget(self.filechooser)
+        button = Button(text='Generate Report')
+        button.bind(on_release=self.generate_report)
+        layout.add_widget(button)
+        return layout
+
+    def generate_report(self, instance):
+        # Get the selected file
+        selected_files = self.filechooser.selection
+        if not selected_files:
+            print('No file selected')
+            return
+        file_path = selected_files[0]
+        print(f'Generating report from {file_path}')
+        create_pdf(file_path)
+
+if __name__ == '__main__':
+    MyApp().run()

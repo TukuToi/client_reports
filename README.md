@@ -2,7 +2,7 @@
 A python application to generate insightful PDF summaries of timeEdition exported CSV Files
 
 ## Description
-This script reads CSV data from the timeEdition application, processes it, and generates a PDF report. One of the primary challenges during the implementation was arranging the layout of the PDF using the reportlab library.
+This script reads CSV data from the timeEdition application, processes it, and generates a PDF report.
 
 ## Setup and Installation
 1. Clone the repository:
@@ -20,11 +20,11 @@ This script reads CSV data from the timeEdition application, processes it, and g
 
 ## Usage
 - Replace the logo.png with your own logo.
-- replace the (currently empty) `data.csv` file with an export from the timeEdition app, in CSV UTF-8 format.
 - Run the script with:
 ```
 python main.py
 ```
+- in the GUI that opens, select your CSV file of which you want to generated a report. It must be a timeEdition Exported CSV file in `utf-8` format, press "Generate Report"
 - find the generated PDF Report in the project folder.
 
 ## Contributing
